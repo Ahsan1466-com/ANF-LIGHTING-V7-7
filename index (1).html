@@ -1,0 +1,1258 @@
+<!DOCTYPE html>
+<html>
+  
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ANF AUDIO LIGHT + BEAM VOLUME</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#000000">
+  <style>
+    html,body{
+      margin:0;
+      width:100%;
+      height:100%;
+      overflow:hidden;
+      font-family:Arial;
+      background:#000;
+    }
+    #app{display:flex;flex-direction:column;width:100%;height:100%;}
+    #stageWrap{flex:1;position:relative;min-height:280px;}
+    canvas{
+      display:block;
+      width:100%;
+      height:100%;
+      touch-action:none;
+    }
+    #watermark{
+      position:fixed;top:10px;right:15px;color:#FF0000;font-size:16px;font-weight:bold;
+      opacity:0.85;text-shadow:0 0 10px #00ffff;z-index:1000;pointer-events:none;
+    }
+    #console{
+      position:relative;
+      background:linear-gradient(180deg,#4d4d4d,#2a2a2a);
+      color:#fff;
+      padding:10px;
+      width:100%;
+      box-sizing:border-box;
+      z-index:999;
+      font-size:12px;
+      max-height:35vh;
+      overflow:auto;
+      border-top:2px solid #00ffff;
+      box-shadow:0 -5px 20px rgba(0,255,255,.25);
+      overflow-x:hidden;
+      overflow-y:auto;
+      -webkit-overflow-scrolling:touch;
+    }
+    button{
+      margin:2px;
+      padding:4px 8px;
+      background:#222;
+      color:#fff;
+      border:1px solid #555;
+      border-radius:4px;
+      font-weight:bold;
+    }
+    button:hover{background:#00bcd4;}
+    .fader{display:flex;align-items:flex-end;gap:24px;overflow-x:auto;padding:10px;}
+    .channel{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;min-width:55px;height:220px;position:relative;flex-shrink:0;}
+    .channel .value{position:absolute;top:-5px;left:50%;transform:translateX(-50%);font-size:12px;font-weight:bold;color:#fff;z-index:5;height:16px;}
+    .channel input[type=range]{
+      -webkit-appearance:none;appearance:none;width:120px;height:100px;background:transparent;
+      transform:rotate(-90deg);transform-origin:center;position:absolute;bottom:45px;
+    }
+    .channel input[type=range]::-webkit-slider-runnable-track{height:8px;background:#222;border-radius:5px;border:1px solid #444;}
+    .channel input[type=range]::-webkit-slider-thumb{
+      -webkit-appearance:none;width:22px;height:18px;background:#d8d8d8;border:1px solid #555;border-radius:3px;margin-top:-6px;cursor:pointer;
+    }
+    .channel input[type=range]::-moz-range-track{height:8px;background:#222;border-radius:5px;border:1px solid #444;}
+    .channel input[type=range]::-moz-range-thumb{width:22px;height:18px;background:#d8d8d8;border:1px solid #555;border-radius:3px;cursor:pointer;}
+    .channel label{position:absolute;bottom:50px;font-size:10px;font-weight:bold;color:#fff;text-align:center;}
+    textarea{height:48px;resize:vertical;}
+    #cropPanel{position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:2000;display:none;}
+    #cropCanvas{width:100%;height:100%;display:block;touch-action:none;cursor:move;}
+    #cropControls{position:fixed;left:10px;bottom:10px;z-index:2001;background:rgba(50,50,50,0.85);padding:6px;border-radius:6px;}
+  </style>
+
+  
+</head>
+
+<body>
+<div id="app">
+  <div id="stageWrap">
+    <canvas id="stage"></canvas>
+    <div id="watermark">by ANF AUDIO 2🔊🔊</div>
+  </div>
+
+  <div id="console">
+    Movement:
+    <button onclick="moveMode='fan'">FAN</button>
+    <button onclick="moveMode='wave'">WAVE</button>
+    <button onclick="moveMode='zigzag'">ZIG-ZAG</button>
+    <button onclick="moveMode='zigzag_ud'">ZIGZAG U-D</button>
+    <button onclick="moveMode='concert'">CONCERT</button>
+    <button onclick="moveMode='pargoy'">PARGOY</button>
+    <button onclick="moveMode='circle'">CIRCLE</button>
+    <button onclick="moveMode='crazy'">CRAZY</button>
+    <button onclick="moveMode='all_lr'">ALL L-R</button>
+    <button onclick="moveMode='updown'">UP-DOWN</button>
+    <button onclick="moveMode='all_updown'">ALL UP-DOWN</button>
+    <button onclick="moveMode='infinity'">INFINITY</button>
+    <button onclick="moveMode='custom'">CUSTOM</button>
+    <button onclick="pauseMove()">PAUSE</button>
+    <button onclick="resumeMove()">RESUME</button>
+    <br><br>
+minibrute
+<button id="miniBruteBtn"></button>
+<br><br>
+
+    Strobe:
+    <button onclick="strobe='off'">OFF</button>
+    <button onclick="strobe='slow'">SLOW</button>
+    <button onclick="strobe='fast'">FAST</button>
+    <button onclick="strobe='pulse'">PULSE</button>
+    <button onclick="strobe='chase'">CHASE</button>
+    <button onclick="strobe='single'">SINGLE</button>
+    <button onclick="strobe='single_in'">SINGLE IN</button>
+    <br><br>
+
+    Mode beam:
+    <button onclick="beamMode='normal'">NORMAL</button>
+    <button onclick="beamMode='prisma'">PRISMA</button>
+    <br><br>
+
+    Custom movement per frame:
+    <div>X = <input type="text" id="customX" value="Math.sin(t*2 + i*0.4)*250"></div>
+    <div>Y = <input type="text" id="customY" value="Math.cos(t*2 + i*0.4)*180"></div>
+    <button onclick="applyCustomMovement()">APPLY CUSTOM</button>
+    <div style="margin-top:4px;">Pakai variabel: <b>t</b>, <b>i</b>, <b>sp</b>, <b>headCount</b>, <b>w</b>, <b>h</b></div>
+    <br>
+
+    <div class="fader">
+      <div class="channel">
+        <input type="range" min="0" max="100" value="40" id="fog">
+        <label>FOG</label>
+      </div>
+      <div class="channel">
+        <input type="range" min="1" max="100" value="40" id="beam">
+        <label>BEAM</label>
+      </div>
+      <div class="channel">
+        <input type="range" min="1" max="30" value="10" id="strobeSpeed">
+        <label>STR</label>
+      </div>
+      <div class="channel">
+        <input type="range" min="1" max="30" value="10" id="moveSpeed">
+        <label>MOVE</label>
+      </div>
+      <div class="channel">
+        <div class="value" id="headLabel">10</div>
+        <input type="range" min="1" max="20" value="10" id="headCount">
+        <label>HEAD</label>
+      </div>
+      <div class="channel">
+        <div class="value" id="strobeBarLabel">4</div>
+        <input type="range" min="0" max="20" value="4" id="strobeBarCount">
+        <label>SBAR</label>
+      </div>
+      <div class="channel">
+        <div class="value" id="strobeScaleLabel">100</div>
+        <input type="range" min="50" max="300" value="100" id="strobeScale">
+        <label>SIZE</label>
+      </div>
+      <div class="channel">
+        <div class="value" id="strobeBoxLabel">4</div>
+        <input type="range" min="0" max="12" value="4" id="strobeBoxCount">
+        <label>SBOX</label>
+      </div>
+      <div class="channel">
+        <div class="value" id="squareScaleLabel">30</div>
+        <input type="range" min="10" max="300" value="30" id="squareScale">
+        <label>S-SIZE</label>
+      </div>
+    </div>
+
+    posisi
+    <button onclick="toggleStrobeEdit()">EDIT STROBE OFF</button>
+    <button onclick="toggleEdit()">EDIT OFF</button>
+    <button onclick="resetHeadPos()">RESET POSISI</button>
+
+    <div style="margin-top:6px;">
+      rotate (ikut seleksi: kotak diprioritaskan)
+      <button onclick="rotateSelectedAny(-0.1)">↺</button>
+      <button onclick="rotateSelectedAny(0.1)">↻</button>
+    </div>
+
+    Color <input type="color" value="#00ffff" id="color">
+    Background <input type="file" id="bgUpload" accept="image/*">
+  </div>
+</div>
+
+<div id="cropPanel">
+  <canvas id="cropCanvas"></canvas>
+  <div id="cropControls">
+    <button onclick="applyCrop()">APPLY</button>
+    <button onclick="closeCrop()">CANCEL</button>
+  </div>
+</div>
+
+<script>
+/* --- Existing code unchanged above --- */
+/* NOTE: only strobe kotak efek (drawStrobeSquares) is updated */
+
+const miniBtn=document.getElementById("miniBruteBtn");
+
+miniBtn.addEventListener("pointerdown",()=>{ miniBruteActive=true; });
+document.addEventListener("pointerup",()=>{ miniBruteActive=false; });
+miniBtn.addEventListener("pointerdown",()=>{ miniBruteActive = true; });
+miniBtn.addEventListener("pointerup",()=>{ miniBruteActive = false; });
+miniBtn.addEventListener("pointerleave",()=>{ miniBruteActive = false; });
+miniBtn.addEventListener("pointercancel",()=>{ miniBruteActive = false; });
+
+const headCountSlider = document.getElementById("headCount");
+const headLabel = document.getElementById("headLabel");
+headCountSlider.oninput = function(){ headLabel.textContent = this.value; };
+
+const canvas = document.getElementById("stage");
+const ctx = canvas.getContext("2d");
+canvas.addEventListener("contextmenu",(e)=>{ e.preventDefault(); });
+
+const cropPanel = document.getElementById("cropPanel");
+const cropCanvas = document.getElementById("cropCanvas");
+const cropCtx = cropCanvas.getContext("2d");
+
+const strobeBarCount = document.getElementById("strobeBarCount");
+const strobeBarLabel = document.getElementById("strobeBarLabel");
+const strobeBoxCount = document.getElementById("strobeBoxCount");
+const strobeBoxLabel = document.getElementById("strobeBoxLabel");
+
+strobeBoxCount.oninput = function(){ strobeBoxLabel.textContent = this.value; };
+strobeBarCount.oninput = function(){ strobeBarLabel.textContent = this.value; };
+
+function resize(){
+  const stageWrap = document.getElementById("stageWrap");
+  canvas.width = stageWrap.clientWidth;
+  canvas.height = stageWrap.clientHeight;
+}
+resize();
+
+function resizeCropCanvas(){
+  cropCanvas.width = window.innerWidth;
+  cropCanvas.height = window.innerHeight;
+}
+resizeCropCanvas();
+
+window.addEventListener("resize", ()=>{
+  resize();
+  resizeCropCanvas();
+  if(cropImage) drawCropUI();
+});
+
+const strobeScale = document.getElementById("strobeScale");
+const strobeScaleLabel = document.getElementById("strobeScaleLabel");
+const squareScale = document.getElementById("squareScale");
+const squareScaleLabel = document.getElementById("squareScaleLabel");
+
+let strobeBarScale = 1;
+let strobeSquareScale = 0.3;
+
+squareScale.oninput = function(){
+  strobeSquareScale = this.value/100;
+  squareScaleLabel.textContent = this.value + "%";
+};
+strobeScale.oninput = function(){
+  strobeBarScale = this.value/100;
+  strobeScaleLabel.textContent = this.value + "%";
+};
+
+let moveMode="fan";
+let strobe="off";
+let beamMode="normal";
+let moveT=0;
+let t=0;
+let paused=false;
+let editMode=false;
+let editStrobeMode=false;
+
+let selectedStrobe=-1;
+let selectedStrobeSquare=-1;
+let miniBruteActive=false;
+
+let miniBrutePos={ x:0, y:0, rot:0 };
+
+let dragging=false;
+let draggingStrobe=false;
+let draggingStrobeSquare=false;
+let rotateStrobe=false;
+
+let bgImage=null;
+let cropImage=null;
+
+let headPos=[];
+let strobeBarPos=[];
+let strobeSquarePos=[];
+
+for(let i=0;i<20;i++) strobeSquarePos.push({ x:0, y:0, rot:0 });
+for(let i=0;i<12;i++) strobeBarPos.push({ x:0, y:0, rot:0 });
+
+let selectedHead=-1;
+
+let dragHeadStartPointerX=0;
+let dragHeadStartPointerY=0;
+let dragHeadStartPosX=0;
+let dragHeadStartPosY=0;
+
+let dragStrobeStartPointerX=0;
+let dragStrobeStartPointerY=0;
+let dragStrobeStartPosX=0;
+let dragStrobeStartPosY=0;
+let dragStrobeStartIndex=-1;
+let dragStrobeIsSquare=false;
+
+let cropRect={x:80,y:80,w:240,h:180};
+let cropDrag={active:false,mode:"none",startX:0,startY:0,baseX:0,baseY:0,baseW:0,baseH:0,corner:""};
+let cropBase={x:0,y:0,w:0,h:0,scale:1};
+
+let customMoveXExpr="Math.sin(t*2 + i*0.4)*250";
+let customMoveYExpr="Math.cos(t*2 + i*0.4)*180";
+
+for(let i=0;i<20;i++) headPos.push({x:0,y:0});
+
+function pauseMove(){ paused=true; }
+function resumeMove(){ paused=false; }
+
+function resetHeadPos(){
+  for(let i=0;i<strobeSquarePos.length;i++){
+    strobeSquarePos[i].x=0; strobeSquarePos[i].y=0; strobeSquarePos[i].rot=0;
+  }
+  for(let i=0;i<headPos.length;i++){ headPos[i].x=0; headPos[i].y=0; }
+  for(let i=0;i<strobeBarPos.length;i++){ strobeBarPos[i].x=0; strobeBarPos[i].y=0; strobeBarPos[i].rot=0; }
+  selectedHead=-1;
+  dragging=false;
+  selectedStrobe=-1;
+  selectedStrobeSquare=-1;
+  draggingStrobe=false;
+  draggingStrobeSquare=false;
+  rotateStrobe=false;
+}
+
+function applyCustomMovement(){
+  customMoveXExpr=document.getElementById("customX").value || "0";
+  customMoveYExpr=document.getElementById("customY").value || "0";
+  moveMode="custom";
+}
+
+function safeEval(expr, vars){
+  try{
+    return Function("t","i","sp","headCount","w","h","Math",`return (${expr});`)( 
+      vars.t, vars.i, vars.sp, vars.headCount, vars.w, vars.h, Math
+    );
+  }catch(e){ return 0; }
+}
+
+function strobeState(i){
+  let sp=document.getElementById("strobeSpeed").value/10;
+  let headCount=parseInt(document.getElementById("headCount").value);
+  switch(strobe){
+    case "off": return true;
+    case "slow": return Math.floor(t*2*sp)%2===0;
+    case "fast": return Math.floor(t*8*sp)%2===0;
+    case "pulse": return Math.sin(t*5*sp)>0;
+    case "chase": return Math.floor(t*10*sp+i)%2===0;
+    case "single":{
+      let cycle=Math.floor(t*(10*sp));
+      let active=cycle%headCount;
+      let dir=Math.floor(cycle/headCount)%2;
+      return dir===0 ? (i===active) : (i===headCount-1-active);
+    }
+    case "single_in":{
+      let cycle=Math.floor(t*(10*sp));
+      let half=Math.max(1,Math.floor(headCount/2));
+      let step=cycle%(half+1);
+      return i===step || i===headCount-1-step;
+    }
+    default: return true;
+  }
+}
+
+function moveX(i){
+  let sp=document.getElementById("moveSpeed").value/10;
+  let headCount=parseInt(document.getElementById("headCount").value);
+  switch(moveMode){
+    case "fan": return (i-(headCount-1)/2)*50;
+    case "wave": return Math.sin(moveT*sp*4 + i*0.5)*300;
+    case "pargoy": return Math.sin(moveT*sp*3 + i)*800 + Math.sin(t*sp*6)*60;
+    case "crazy": return Math.sin(moveT*sp*5+i)*350 + Math.cos(t*sp+i)*120;
+    case "all_lr": return Math.sin(moveT*sp*5)*3500 + (i-6)*5000000;
+    case "circle": return Math.cos(moveT*sp)*550;
+    case "zigzag_ud": return Math.sin(moveT*sp*1)*1000;
+    case "zigzag": return Math.sin(moveT*sp*6) * 1000 * ((i % 2 === 0) ? 1 : -1);
+    case "concert": return (i-(headCount-1)/2)*200 + Math.sin(moveT*sp*4)*90;
+    case "infinity":{
+      let lane=i/(headCount-1 || 1);
+      let a=moveT*sp*2.0 + lane*Math.PI*2;
+      return Math.sin(a)*canvas.width*0.18;
+    }
+    case "custom": return safeEval(customMoveXExpr,{t, i, sp, headCount, w:canvas.width, h:canvas.height});
+    default: return 0;
+  }
+}
+
+function moveY(i){
+  let sp=document.getElementById("moveSpeed").value/10;
+  let headCount=parseInt(document.getElementById("headCount").value);
+  switch(moveMode){
+    case "wave": return Math.sin(moveT*sp*4)*900;
+    case "pargoy": return Math.sin(moveT*sp*2)*1000;
+    case "updown": return Math.sin(moveT*sp*4 + i*0.5)*900;
+    case "all_updown": return Math.sin(moveT*sp*4)*1000;
+    case "crazy": return Math.cos(moveT*sp*6+i)*180;
+    case "circle": return Math.sin(moveT*sp)*1000;
+    case "zigzag": return Math.sin(moveT*sp*1)*1000;
+    case "zigzag_ud": return Math.sin(moveT*sp*6) * 1000 * ((i % 2 === 0) ? 1 : -1);
+    case "concert": return 400 + Math.cos(moveT*sp*8)*95;
+    case "infinity":{
+      let lane=i/(headCount-1 || 1);
+      let a=moveT*sp*2.0 + lane*Math.PI*2;
+      let x=Math.sin(a);
+      let y=Math.sin(a*2);
+      return canvas.height*0.18 + y*(canvas.height*0.12) - Math.abs(x)*(canvas.height*0.10);
+    }
+    case "custom": return safeEval(customMoveYExpr,{t, i, sp, headCount, w:canvas.width, h:canvas.height});
+    default: return 0;
+  }
+}
+
+function drawFog(){
+  let fog=document.getElementById("fog").value/100;
+  for(let i=0;i<3;i++){
+    let y=Math.random()*canvas.height;
+    let grad=ctx.createLinearGradient(0,y,0,y+120);
+    grad.addColorStop(0,"rgba(255,255,255,0)");
+    grad.addColorStop(0.5,`rgba(255,255,255,${fog*0.01})`);
+    grad.addColorStop(1,"rgba(255,255,255,0)");
+    ctx.fillStyle=grad;
+    ctx.fillRect(0,y,canvas.width,120);
+  }
+}
+
+function drawBackground(){
+  if(!bgImage){ ctx.fillStyle="#000"; ctx.fillRect(0,0,canvas.width,canvas.height); return; }
+  ctx.drawImage(bgImage,0,0,canvas.width,canvas.height);
+}
+
+function drawBeam3D(px,py,ex,ey,color,beamVolume){
+  if(beamMode==="prisma"){
+    for(let p=-1;p<=2;p++){
+      ctx.globalAlpha=0.7;
+      ctx.strokeStyle=color;
+      ctx.lineWidth=4;
+      ctx.beginPath();
+      ctx.moveTo(px+p*2,py);
+      ctx.lineTo(ex+p*30,ey);
+      ctx.stroke();
+    }
+  }else{
+    ctx.globalAlpha=0.20;
+    ctx.strokeStyle=color;
+    ctx.lineWidth=13 + beamVolume*10;
+    ctx.beginPath();
+    ctx.moveTo(px,py);
+    ctx.lineTo(ex,ey);
+    ctx.stroke();
+
+    ctx.globalAlpha=0.8;
+    ctx.lineWidth=4 + beamVolume*12;
+    ctx.beginPath();
+    ctx.moveTo(px,py);
+    ctx.lineTo(ex,ey);
+    ctx.stroke();
+  }
+  ctx.globalAlpha=1;
+}
+
+function getStrobeBarBaseXY(i){
+  const count=parseInt(document.getElementById("strobeBarCount").value);
+  return { x: canvas.width*0.15+(i/Math.max(1,count-1))*(canvas.width*0.7), y: canvas.height*0.35 };
+}
+function getStrobeSquareBaseXY(i){
+  const count=parseInt(document.getElementById("strobeBoxCount").value);
+  return { x: canvas.width*0.15+(i/Math.max(1,count-1))*(canvas.width*0.7), y: canvas.height*0.55 };
+}
+
+function hitTestStrobe(p){
+  const count=parseInt(document.getElementById("strobeBarCount").value);
+  const halfW = (104 * strobeBarScale) / 2 + 14;
+  const halfH = (16  * strobeBarScale) / 2 + 10;
+
+  for(let i=count-1;i>=0;i--){
+    const base = getStrobeBarBaseXY(i);
+    const x = base.x + strobeBarPos[i].x;
+    const y = base.y + strobeBarPos[i].y;
+
+    if(p.x > x-halfW && p.x < x+halfW && p.y > y-halfH && p.y < y+halfH) return i;
+  }
+  return -1;
+}
+
+function hitTestStrobeSquare(p){
+  const count=parseInt(document.getElementById("strobeBoxCount").value);
+  const halfW = (130 * strobeSquareScale) / 2 + 20;
+  const halfH = (60  * strobeSquareScale) / 2 + 18;
+
+  for(let i=count-1;i>=0;i--){
+    const base = getStrobeSquareBaseXY(i);
+    const x = base.x + strobeSquarePos[i].x;
+    const y = base.y + strobeSquarePos[i].y;
+
+    if(p.x > x-halfW && p.x < x+halfW && p.y > y-halfH && p.y < y+halfH) return i;
+  }
+  return -1;
+}
+
+function draw(){
+  t += 0.02;
+  if(!paused) moveT += 0.02;
+
+  drawBackground();
+  drawFog();
+
+  drawStrobeBars();
+  drawStrobeSquares();
+  drawMiniBrute();
+
+  let color=document.getElementById("color").value;
+  let beamVolume=document.getElementById("beam").value/100;
+  ctx.globalCompositeOperation="lighter";
+  let headCount=parseInt(document.getElementById("headCount").value);
+
+  for(let i=0;i<headCount;i++){
+    if(miniBruteActive) continue;
+    if(!strobeState(i)) continue;
+
+    let px=canvas.width*0.15 + (i/Math.max(1,headCount-1))*(canvas.width*0.7) + headPos[i].x;
+    let py=canvas.height*0.15 + headPos[i].y;
+    let ex=canvas.width/2 + headPos[i].x + moveX(i);
+    let ey=canvas.height - moveY(i);
+
+    if(moveMode==="all_lr"){
+      ex=(canvas.width*0.15 + (i/Math.max(1,headCount-1))*(canvas.width*0.7)) + Math.sin(moveT*0.8)*400;
+    }
+
+    drawBeam3D(px,py,ex,ey,color,beamVolume);
+
+    ctx.beginPath();
+    ctx.arc(px,py,2 + beamVolume*2,0,Math.PI*2);
+    ctx.fillStyle=color;
+    ctx.fill();
+
+    let angle=Math.atan2(ey-py,ex-px);
+    ctx.save();
+    ctx.translate(px,py);
+    ctx.rotate(angle+Math.PI/2);
+    ctx.fillStyle="#222";
+    ctx.beginPath();
+    ctx.roundRect(-10,-8,20,16,3);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(0,0,5,0,Math.PI*2);
+    ctx.fillStyle=color;
+    ctx.fill();
+
+    if(editMode){
+      ctx.strokeStyle="#ffffff";
+      ctx.lineWidth=2;
+      ctx.beginPath();
+      ctx.arc(0,0,14,0,Math.PI*2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  if(editMode){
+    ctx.globalCompositeOperation="source-over";
+    ctx.fillStyle="rgba(255,255,255,0.7)";
+    ctx.font="12px Arial";
+    ctx.fillText("EDIT MODE: klik moving head lalu drag untuk geser", 12, 20);
+    if(selectedHead>=0){
+      ctx.strokeStyle="#ffff00";
+      ctx.lineWidth=2;
+      let spacing=(canvas.width*0.7)/Math.max(1,parseInt(document.getElementById("headCount").value)-1);
+      let startX=canvas.width*0.15;
+      let px=startX+selectedHead*spacing+headPos[selectedHead].x;
+      let py=canvas.height*0.15+headPos[selectedHead].y;
+      ctx.beginPath();
+      ctx.arc(px,py,20,0,Math.PI*2);
+      ctx.stroke();
+    }
+  }
+
+  ctx.globalCompositeOperation="source-over";
+  requestAnimationFrame(draw);
+}
+
+function openCrop(img){
+  cropImage=img;
+  cropPanel.style.display="block";
+  resizeCropCanvas();
+  const scale=Math.min(cropCanvas.width/img.width, cropCanvas.height/img.height);
+  const dw=img.width*scale;
+  const dh=img.height*scale;
+  cropBase={x:(cropCanvas.width-dw)/2,y:(cropCanvas.height-dh)/2,w:dw,h:dh,scale:scale};
+  cropRect={x:cropBase.x + dw*0.2,y:cropBase.y + dh*0.2,w:dw*0.6,h:dh*0.6};
+  drawCropUI();
+}
+
+function closeCrop(){
+  cropPanel.style.display="none";
+  cropImage=null;
+  cropDrag.active=false;
+  cropDrag.mode="none";
+}
+
+function drawCropUI(){
+  cropCtx.clearRect(0,0,cropCanvas.width,cropCanvas.height);
+  if(!cropImage) return;
+  cropCtx.drawImage(cropImage,cropBase.x,cropBase.y,cropBase.w,cropBase.h);
+
+  cropCtx.save();
+  cropCtx.fillStyle="rgba(0,0,0,0.45)";
+  cropCtx.beginPath();
+  cropCtx.rect(0,0,cropCanvas.width,cropCanvas.height);
+  cropCtx.rect(cropRect.x,cropRect.y,cropRect.w,cropRect.h);
+  cropCtx.fill("evenodd");
+  cropCtx.restore();
+
+  cropCtx.strokeStyle="#00ffff";
+  cropCtx.lineWidth=3;
+  cropCtx.strokeRect(cropRect.x,cropRect.y,cropRect.w,cropRect.h);
+
+  const s=10;
+  const corners=[
+    [cropRect.x,cropRect.y],
+    [cropRect.x+cropRect.w,cropRect.y],
+    [cropRect.x,cropRect.y+cropRect.h],
+    [cropRect.x+cropRect.w,cropRect.y+cropRect.h]
+  ];
+  cropCtx.fillStyle="#00ffff";
+  corners.forEach(([x,y])=>{ cropCtx.fillRect(x-s,y-s,s*2,s*2); });
+}
+
+function cropPointFromEvent(e){
+  const r=cropCanvas.getBoundingClientRect();
+  return { x:(e.clientX-r.left)*(cropCanvas.width/r.width), y:(e.clientY-r.top)*(cropCanvas.height/r.height) };
+}
+
+function beginCropDrag(e){
+  if(!cropImage) return;
+  const p=cropPointFromEvent(e);
+  const s=24;
+  const cornerHits=[
+    {name:"tl",x:cropRect.x,y:cropRect.y},
+    {name:"tr",x:cropRect.x+cropRect.w,y:cropRect.y},
+    {name:"bl",x:cropRect.x,y:cropRect.y+cropRect.h},
+    {name:"br",x:cropRect.x+cropRect.w,y:cropRect.y+cropRect.h},
+  ];
+  let hit=cornerHits.find(c=>Math.abs(p.x-c.x)<=s && Math.abs(p.y-c.y)<=s);
+  const inBox=p.x>=cropRect.x && p.x<=cropRect.x+cropRect.w && p.y>=cropRect.y && p.y<=cropRect.y+cropRect.h;
+
+  cropDrag.active=true;
+  cropDrag.mode=hit ? "corner" : (inBox ? "move" : "none");
+  cropDrag.corner=hit ? hit.name : "";
+  cropDrag.startX=p.x; cropDrag.startY=p.y;
+  cropDrag.baseX=cropRect.x; cropDrag.baseY=cropRect.y;
+  cropDrag.baseW=cropRect.w; cropDrag.baseH=cropRect.h;
+  if(cropDrag.mode==="none") cropDrag.active=false;
+}
+
+function updateCropDrag(e){
+  if(!cropImage || !cropDrag.active) return;
+  const p=cropPointFromEvent(e);
+  const dx=p.x-cropDrag.startX;
+  const dy=p.y-cropDrag.startY;
+
+  if(cropDrag.mode==="move"){
+    cropRect.x=cropDrag.baseX+dx; cropRect.y=cropDrag.baseY+dy;
+  }else if(cropDrag.mode==="corner"){
+    let x=cropDrag.baseX, y=cropDrag.baseY, w=cropDrag.baseW, h=cropDrag.baseH;
+    if(cropDrag.corner==="tl"){ x=cropDrag.baseX+dx; y=cropDrag.baseY+dy; w=cropDrag.baseW-dx; h=cropDrag.baseH-dy; }
+    if(cropDrag.corner==="tr"){ y=cropDrag.baseY+dy; w=cropDrag.baseW+dx; h=cropDrag.baseH-dy; }
+    if(cropDrag.corner==="bl"){ x=cropDrag.baseX+dx; w=cropDrag.baseW-dx; h=cropDrag.baseH+dy; }
+    if(cropDrag.corner==="br"){ w=cropDrag.baseW+dx; h=cropDrag.baseH+dy; }
+    if(w<40){ if(cropDrag.corner==="tl"||cropDrag.corner==="bl") x=x-(40-w); w=40; }
+    if(h<40){ if(cropDrag.corner==="tl"||cropDrag.corner==="tr") y=y-(40-h); h=40; }
+    cropRect.x=x; cropRect.y=y; cropRect.w=w; cropRect.h=h;
+  }
+  drawCropUI();
+}
+
+cropCanvas.addEventListener("pointerdown",(e)=>{ cropCanvas.setPointerCapture(e.pointerId); beginCropDrag(e); });
+cropCanvas.addEventListener("pointermove",updateCropDrag);
+cropCanvas.addEventListener("pointerup",()=>{ cropDrag.active=false; cropDrag.mode="none"; cropDrag.corner=""; });
+cropCanvas.addEventListener("pointercancel",()=>{ cropDrag.active=false; cropDrag.mode="none"; cropDrag.corner=""; });
+
+function applyCrop(){
+  if(!cropImage) return;
+  const temp=document.createElement("canvas");
+  const tctx=temp.getContext("2d");
+  const sx=(cropRect.x-cropBase.x)/cropBase.scale;
+  const sy=(cropRect.y-cropBase.y)/cropBase.scale;
+  const sw=cropRect.w/cropBase.scale;
+  const sh=cropRect.h/cropBase.scale;
+
+  temp.width=Math.max(1,Math.round(sw));
+  temp.height=Math.max(1,Math.round(sh));
+  tctx.drawImage(cropImage,sx,sy,sw,sh,0,0,temp.width,temp.height);
+
+  const img=new Image();
+  img.onload=function(){ bgImage=img; closeCrop(); };
+  img.src=temp.toDataURL("image/png");
+}
+
+document.getElementById("bgUpload").addEventListener("change",(e)=>{
+  const file=e.target.files[0];
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=function(ev){
+    const img=new Image();
+    img.onload=function(){ openCrop(img); };
+    img.src=ev.target.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+function toggleStrobeEdit(){
+  editStrobeMode=!editStrobeMode;
+  let btn=document.querySelector('button[onclick="toggleStrobeEdit()"]');
+  btn.innerText= editStrobeMode ? "🟢EDIT STROBE ON" : "🔴EDIT STROBE OFF";
+}
+
+function toggleEdit(){
+  editMode=!editMode;
+  selectedHead=-1;
+  dragging=false;
+  draggingMiniBrute=false;
+  let btn=document.querySelector('button[onclick="toggleEdit()"]');
+  btn.innerText=editMode ? "🟢EDIT ON" : "🔴EDIT OFF";
+  if(!editMode){
+    draggingStrobe=false;
+    draggingStrobeSquare=false;
+    selectedStrobe=-1;
+    selectedStrobeSquare=-1;
+    rotateStrobe=false;
+    draggingMiniBrute=false;
+  }
+}
+
+function getPointerPos(e){
+  const rect=canvas.getBoundingClientRect();
+  return {
+    x:(e.clientX-rect.left)*(canvas.width/rect.width),
+    y:(e.clientY-rect.top)*(canvas.height/rect.height)
+  };
+}
+
+function getHeadCount(){ return parseInt(document.getElementById("headCount").value); }
+
+function hitTestHead(p){
+  const headCount=getHeadCount();
+  const spacing=(canvas.width*0.7)/Math.max(1,headCount-1);
+  const startX=canvas.width*0.15;
+  for(let i=headCount-1;i>=0;i--){
+    const px=startX+i*spacing+headPos[i].x;
+    const py=canvas.height*0.15+headPos[i].y;
+    if(Math.hypot(p.x-px,p.y-py)<40) return i;
+  }
+  return -1;
+}
+
+function hitTestMiniBrute(p){
+  let x=canvas.width/2 + miniBrutePos.x;
+  let y=canvas.height*0.75 + miniBrutePos.y;
+  return (
+    p.x > x-70 &&
+    p.x < x+10 &&
+    p.y > y-35 &&
+    p.y < y+5
+  );
+}
+
+let activePointerId=null;
+
+let draggingMiniBrute=false;
+
+let dragMiniStartPointerX=0;
+let dragMiniStartPointerY=0;
+let dragMiniStartPosX=0;
+let dragMiniStartPosY=0;
+
+function clearDragFlags(){
+  dragging=false;
+  draggingStrobe=false;
+  draggingStrobeSquare=false;
+  rotateStrobe=false;
+  selectedHead=-1;
+  draggingMiniBrute=false;
+}
+
+canvas.addEventListener("pointerdown",(e)=>{
+  if(!editMode && !editStrobeMode) return;
+  if(e.pointerType==="touch") e.preventDefault();
+
+  const p=getPointerPos(e);
+  activePointerId=e.pointerId;
+
+  dragging=false;
+  draggingStrobe=false;
+  draggingStrobeSquare=false;
+  rotateStrobe=false;
+  draggingMiniBrute=false;
+
+  if(hitTestMiniBrute(p)){
+    draggingMiniBrute=true;
+    dragMiniStartPointerX=p.x;
+    dragMiniStartPointerY=p.y;
+    dragMiniStartPosX=miniBrutePos.x;
+    dragMiniStartPosY=miniBrutePos.y;
+    canvas.setPointerCapture(e.pointerId);
+    return;
+  }
+
+  if(editStrobeMode){
+    selectedStrobe = hitTestStrobe(p);
+    selectedStrobeSquare = hitTestStrobeSquare(p);
+    rotateStrobe = (e.button===2);
+
+    if(selectedStrobeSquare>=0){
+      draggingStrobeSquare = !rotateStrobe;
+
+      dragStrobeStartPointerX = p.x;
+      dragStrobeStartPointerY = p.y;
+      dragStrobeStartIndex = selectedStrobeSquare;
+      dragStrobeIsSquare = true;
+
+      dragStrobeStartPosX = strobeSquarePos[selectedStrobeSquare].x;
+      dragStrobeStartPosY = strobeSquarePos[selectedStrobeSquare].y;
+
+      canvas.setPointerCapture(e.pointerId);
+      return;
+    }
+    if(selectedStrobe>=0){
+      draggingStrobe = !rotateStrobe;
+
+      dragStrobeStartPointerX = p.x;
+      dragStrobeStartPointerY = p.y;
+      dragStrobeStartIndex = selectedStrobe;
+      dragStrobeIsSquare = false;
+
+      dragStrobeStartPosX = strobeBarPos[selectedStrobe].x;
+      dragStrobeStartPosY = strobeBarPos[selectedStrobe].y;
+
+      canvas.setPointerCapture(e.pointerId);
+      return;
+    }
+  }
+
+  if(!editMode) return;
+
+  selectedHead=hitTestHead(p);
+  if(selectedHead>=0){
+    dragging=true;
+
+    dragHeadStartPointerX = p.x;
+    dragHeadStartPointerY = p.y;
+    dragHeadStartPosX = headPos[selectedHead].x;
+    dragHeadStartPosY = headPos[selectedHead].y;
+
+    canvas.setPointerCapture(e.pointerId);
+  }
+});
+
+canvas.addEventListener("pointermove",(e)=>{
+  if(activePointerId!==null && e.pointerId!==activePointerId) return;
+  const p=getPointerPos(e);
+
+  if(draggingMiniBrute){
+    const dx=p.x-dragMiniStartPointerX;
+    const dy=p.y-dragMiniStartPointerY;
+    miniBrutePos.x = dragMiniStartPosX + dx;
+    miniBrutePos.y = dragMiniStartPosY + dy;
+    return;
+  }
+
+  if(dragging && selectedHead>=0){
+    const dx = p.x - dragHeadStartPointerX;
+    const dy = p.y - dragHeadStartPointerY;
+    headPos[selectedHead].x = dragHeadStartPosX + dx;
+    headPos[selectedHead].y = dragHeadStartPosY + dy;
+    return;
+  }
+
+  if(draggingStrobeSquare && dragStrobeIsSquare && selectedStrobeSquare>=0){
+    const dx = p.x - dragStrobeStartPointerX;
+    const dy = p.y - dragStrobeStartPointerY;
+    const i = dragStrobeStartIndex;
+    strobeSquarePos[i].x = dragStrobeStartPosX + dx;
+    strobeSquarePos[i].y = dragStrobeStartPosY + dy;
+    return;
+  }
+
+  if(draggingStrobe && !dragStrobeIsSquare && selectedStrobe>=0){
+    const dx = p.x - dragStrobeStartPointerX;
+    const dy = p.y - dragStrobeStartPointerY;
+    const i = dragStrobeStartIndex;
+    strobeBarPos[i].x = dragStrobeStartPosX + dx;
+    strobeBarPos[i].y = dragStrobeStartPosY + dy;
+    return;
+  }
+
+  if(rotateStrobe && editStrobeMode && selectedStrobeSquare>=0){
+    const base=getStrobeSquareBaseXY(selectedStrobeSquare);
+    const i=selectedStrobeSquare;
+    strobeSquarePos[i].rot=Math.atan2(
+      p.y-(base.y+strobeSquarePos[i].y),
+      p.x-(base.x+strobeSquarePos[i].x)
+    );
+  }else if(rotateStrobe && editStrobeMode && selectedStrobe>=0){
+    const base=getStrobeBarBaseXY(selectedStrobe);
+    const i=selectedStrobe;
+    strobeBarPos[i].rot=Math.atan2(
+      p.y-(base.y+strobeBarPos[i].y),
+      p.x-(base.x+strobeBarPos[i].x)
+    );
+  }
+});
+
+canvas.addEventListener("pointerup",(e)=>{
+  if(activePointerId===e.pointerId) activePointerId=null;
+  clearDragFlags();
+});
+canvas.addEventListener("pointercancel",(e)=>{
+  if(activePointerId===e.pointerId) activePointerId=null;
+  clearDragFlags();
+});
+canvas.addEventListener("pointerleave",()=>{
+  dragging=false;
+  draggingStrobe=false;
+  draggingStrobeSquare=false;
+  rotateStrobe=false;
+  selectedHead=-1;
+  draggingMiniBrute=false;
+});
+
+function rotateSelectedAny(delta){
+  if(selectedStrobeSquare>=0){
+    strobeSquarePos[selectedStrobeSquare].rot += delta;
+  }else if(selectedStrobe>=0){
+    strobeBarPos[selectedStrobe].rot += delta;
+  }
+}
+
+function drawStrobeBars(){
+  let count=parseInt(document.getElementById("strobeBarCount").value);
+  let segments=24;
+  let run=Math.floor(t*12)%segments;
+  let autoMode=Math.floor(t/4)%6;
+
+  for(let i=0;i<count;i++){
+    const b=getStrobeBarBaseXY(i);
+    ctx.save();
+    ctx.translate(b.x+strobeBarPos[i].x,b.y+strobeBarPos[i].y);
+    ctx.rotate(strobeBarPos[i].rot);
+    ctx.scale(strobeBarScale, strobeBarScale);
+
+    ctx.fillStyle="#ffff";
+    ctx.strokeStyle="#cccccc";
+    ctx.fillRect(-52,-8,104,16);
+    ctx.lineWidth=1;
+    ctx.strokeRect(-52,-6,104,10);
+
+    for(let s=0;s<segments;s++){
+      let on=false;
+      let hue=0;
+      switch(autoMode){
+        case 0: { let pos1=(s+run)%segments; on=pos1<6; hue=(s*20+t*200)%360; break; }
+        case 1: on=true; hue=s*15; break;
+        case 2: on=Math.floor(t*8)%2===0; hue=(t*100)%360; break;
+        case 3: on=s===Math.floor(t*8)%segments; hue=(s*15)%360; break;
+        case 4: on=s===segments-1-(Math.floor(t*8)%segments); hue=(s*15)%360; break;
+        case 5: on=true; hue=(s*15)%360; ctx.globalAlpha=0.3+Math.abs(Math.sin(t*3))*0.7; break;
+      }
+      if(miniBruteActive) on=false;
+
+      ctx.fillStyle=on ? `hsl(${hue},100%,50%)` : "#111";
+      ctx.shadowBlur=on ? 20 : 0;
+      ctx.shadowColor=on ? document.getElementById("color").value : "#000";
+      ctx.fillRect(-48+(s*4),-3,3,6);
+    }
+
+    ctx.restore();
+    ctx.globalAlpha=1;
+
+    if(editStrobeMode && selectedStrobe===i){
+      ctx.save();
+      ctx.translate(b.x+strobeBarPos[i].x,b.y+strobeBarPos[i].y);
+      ctx.rotate(strobeBarPos[i].rot);
+      ctx.scale(strobeBarScale, strobeBarScale);
+      ctx.strokeStyle="yellow";
+      ctx.lineWidth=2;
+      ctx.strokeRect(-57,-13,114,26);
+      ctx.restore();
+    }
+  }
+  ctx.shadowBlur=0;
+}
+
+function drawStrobeSquares(){
+  let count=parseInt(document.getElementById("strobeBoxCount").value);
+  let cols=18, rows=4;
+  let mode=Math.floor(t/3)%15; // tambah mode (sekarang 0..14)
+
+  for(let i=0;i<count;i++){
+    const b=getStrobeSquareBaseXY(i);
+    ctx.save();
+    ctx.translate(b.x+strobeSquarePos[i].x,b.y+strobeSquarePos[i].y);
+    ctx.rotate(strobeSquarePos[i].rot);
+    ctx.scale(strobeSquareScale,strobeSquareScale);
+
+    ctx.fillStyle="#444"; ctx.fillRect(-65,-30,130,60);
+    ctx.fillStyle="#111"; ctx.fillRect(-55,-22,110,44);
+
+    const panelW=110, panelH=44;
+    const cellW=panelW/cols, cellH=panelH/rows;
+
+    for(let r=0;r<rows;r++){
+      for(let c=0;c<cols;c++){
+        let active=false;
+
+        // normalisasi 0..1
+        const nx = c/(cols-1 || 1);
+        const ny = r/(rows-1 || 1);
+
+        switch(mode){
+          case 0: active = c <= (Math.floor(t*15)%cols); break;
+          case 1: active = c >= cols-1-(Math.floor(t*15)%cols); break;
+          case 2: active = r === (Math.floor(t*12)%rows); break;
+          case 3: active = r === rows-1-(Math.floor(t*12)%rows); break;
+          case 4: active = Math.floor(t*10)%2===0; break;
+          case 5: active = Math.random()>0.7; break;
+          case 6: active = Math.sin(c*0.6 - t*8) > 0.2; break;
+          case 7: active = Math.sin(c*0.5 + r*0.8 - t*8) > 0; break;
+
+          // ===== Tambahan efek =====
+          // 8) GELombang (wave) - merambat di X dan sedikit modulasi Y
+          case 8: {
+            const wave = Math.sin((nx*2.8*Math.PI) - t*4.5 + ny*2.2*Math.sin(t*1.2));
+            active = wave > 0.25;
+            break;
+          }
+          // 9) Ripple dari pusat
+          case 9: {
+            const cx = cols/2, cy = rows/2;
+            const dx = c - cx;
+            const dy = r - cy;
+            const dist = Math.hypot(dx,dy);
+            active = Math.sin(dist*0.85 - t*6) > 0.35;
+            break;
+          }
+          // 10) Spark / petir (acak tapi “bergelombang”)
+          case 10: {
+            const speed = 8 + Math.sin(t*0.8)*2;
+            const gate = Math.sin(nx*10 + ny*6 - t*speed);
+            const rnd = (Math.sin((c+1)*12.9898 + (r+1)*78.233 + t*2.1)*43758.5453)%1;
+            active = gate > 0.55 && rnd > 0.7;
+            break;
+          }
+          // ===========================
+
+          case 11:{
+            let cx=cols/2, cy=rows/2;
+            let dist=Math.hypot(c-cx,r-cy);
+            active=Math.sin(dist*1.5 - t*8)>0;
+            break;
+          }
+          case 12:{
+            let cx=cols/2, cy=rows/2;
+            let dx=c-cx, dy=r-cy;
+            let ang=Math.atan2(dy,dx);
+            let dist=Math.hypot(dx,dy);
+            active=Math.sin(ang*4 + dist - t*8)>0;
+            break;
+          }
+          case 13: active=Math.random()>0.92; break;
+          case 14: active=((c+r+Math.floor(t*12))%8)<4; break;
+        }
+
+        let rainbow=(c*15+r*25+t*250)%360;
+        if(miniBruteActive) active=false;
+
+        ctx.fillStyle=active ? `hsl(${rainbow},100%,50%)` : "#222";
+        ctx.shadowBlur=active ? 6 : 0;
+        ctx.shadowColor=active ? `hsl(${rainbow},100%,50%)` : "#000";
+
+        ctx.fillRect(-55 + c*cellW + 0.5, -22 + r*cellH + 0.5, cellW - 1, cellH - 1);
+      }
+    }
+    ctx.restore();
+
+    if(editStrobeMode && selectedStrobeSquare===i){
+      ctx.save();
+      ctx.translate(b.x+strobeSquarePos[i].x,b.y+strobeSquarePos[i].y);
+      ctx.rotate(strobeSquarePos[i].rot);
+      ctx.scale(strobeSquareScale,strobeSquareScale);
+      ctx.strokeStyle="yellow";
+      ctx.lineWidth=2;
+      ctx.strokeRect(-70,-35,140,70);
+      ctx.restore();
+    }
+  }
+  ctx.shadowBlur=0;
+}
+
+function drawMiniBrute(){
+
+  let x=canvas.width/2 + miniBrutePos.x;
+  let y=canvas.height*0.75 + miniBrutePos.y;
+
+  ctx.save();
+  ctx.translate(x,y);
+  ctx.rotate(miniBrutePos.rot);
+
+  // ===== Body =====
+  let body=ctx.createLinearGradient(0,-35,0,5);
+  body.addColorStop(0,"#555");
+  body.addColorStop(0.4,"#333");
+  body.addColorStop(1,"#111");
+
+  ctx.fillStyle=body;
+
+  ctx.shadowColor="rgba(0,0,0,0.5)";
+  ctx.shadowBlur=15;
+  ctx.shadowOffsetY=6;
+
+  ctx.fillRect(-70,-35,80,40);
+
+  // Highlight atas
+  ctx.fillStyle="rgba(255,255,255,0.12)";
+  ctx.fillRect(-70,-35,80,4);
+
+  // Shadow bawah
+  ctx.fillStyle="rgba(0,0,0,0.25)";
+  ctx.fillRect(-70,1,80,4);
+
+  // Baut
+  ctx.fillStyle="#666";
+
+  ctx.beginPath();
+  ctx.arc(-64,-29,2,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.arc(4,-29,2,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.arc(-64,-1,2,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.arc(4,-1,2,0,Math.PI*2);
+  ctx.fill();
+
+  // ===== Lampu =====
+  let lamps=[[-45,-15],[-15,-15]];
+
+  for(let l of lamps){
+
+    // Ring luar
+    ctx.beginPath();
+    ctx.arc(l[0],l[1],13,0,Math.PI*2);
+    ctx.fillStyle="#111";
+    ctx.fill();
+
+    // Reflektor
+    let g=ctx.createRadialGradient(
+      l[0]-3,l[1]-3,2,
+      l[0],l[1],12
+    );
+
+    if(miniBruteActive){
+
+      g.addColorStop(0,"#ffffff");
+      g.addColorStop(0.3,"#eeeeee");
+      g.addColorStop(1,"#999999");
+
+      ctx.shadowBlur=45;
+      ctx.shadowColor="#ffffff";
+
+    }else{
+
+      g.addColorStop(0,"#777");
+      g.addColorStop(1,"#333");
+
+      ctx.shadowBlur=0;
+
+    }
+
+    ctx.beginPath();
+    ctx.arc(l[0],l[1],11,0,Math.PI*2);
+    ctx.fillStyle=g;
+    ctx.fill();
+
+  }
+
+  ctx.restore();
+
+  ctx.shadowBlur=0;
+}
+
+draw();
+
+document.addEventListener("keydown",(e)=>{
+  if(e.repeat) return;
+  switch(e.key.toLowerCase()){
+    case "f": moveMode="fan"; break;
+    case "v": moveMode="custom"; break;
+    case "d": moveMode="concert"; break;
+    case "w": moveMode="wave"; break;
+    case "p": moveMode="pargoy"; break;
+    case "c": moveMode="circle"; break;
+    case "z": moveMode="zigzag"; break;
+    case "s": moveMode="zigzag_ud"; break;
+    case "x": moveMode="crazy"; break;
+    case "i": moveMode="all_lr"; break;
+    case "u": moveMode="updown"; break;
+    case "a": moveMode="all_updown"; break;
+    case "n": moveMode="infinity"; break;
+    case "5": strobe="single_in"; break;
+    case "3": strobe="single"; break;
+    case "4": strobe="chase"; break;
+    case "0": strobe="off"; break;
+    case "8": beamMode="prisma"; break;
+    case "7": beamMode="normal"; break;
+    case " ": paused=!paused; break;
+
+    case "9":
+      miniBruteActive = true;
+      break;
+  }
+});
+
+document.addEventListener("keyup",(e)=>{
+  if(e.key==="9"){
+    miniBruteActive=false;
+  }
+});
+</script>
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js")
+      .then(() => console.log("SW berhasil"))
+      .catch(err => console.error(err));
+  });
+}
+</script>
+</body>
+</html>
